@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
 import * as XLSX from "xlsx";
 import { formatPhoneNumber, validatePhoneNumber } from "@/lib/phone-utils";
 import { candidatesApi } from "@/lib/supabase";
@@ -14,19 +12,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), "uploads");
-    try {
-      await mkdir(uploadsDir, { recursive: true });
-    } catch (error) {
-      // Directory might already exist
-    }
-
-    // Save file
+    // Read file into buffer and parse Excel file directly from memory
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const filePath = join(uploadsDir, file.name);
-    await writeFile(filePath, buffer);
 
     // Parse Excel file
     const workbook = XLSX.read(buffer, { type: "buffer" });
