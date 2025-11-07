@@ -2,23 +2,32 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
+	console.log("[Vapi Webhook] ===== WEBHOOK RECEIVED =====");
+	console.log("[Vapi Webhook] Headers:", {
+		authorization: request.headers.get("authorization") ? "present" : "missing",
+		contentType: request.headers.get("content-type"),
+		origin: request.headers.get("origin")
+	});
+
 	// Optional simple bearer token check to prevent random posts
 	const authHeader = request.headers.get("authorization") || "";
 	const expected = process.env.WEBHOOK_SECRET;
 	if (expected) {
 		const provided = authHeader.replace(/^Bearer\s+/i, "");
 		if (!provided || provided !== expected) {
+			console.error("[Vapi Webhook] Unauthorized - secret mismatch");
 			return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 		}
+		console.log("[Vapi Webhook] Authorization passed");
 	}
 	
 	try {
 		const body = await request.json();
-		console.log("[Vapi Webhook] Event:", {
-			type: body?.type,
-			callId: body?.callId,
-			dataKeys: body ? Object.keys(body) : [],
-		});
+		console.log("[Vapi Webhook] ===== WEBHOOK EVENT DETAILS =====");
+		console.log("[Vapi Webhook] Event type:", body?.type);
+		console.log("[Vapi Webhook] Call ID:", body?.callId);
+		console.log("[Vapi Webhook] Full event data:", JSON.stringify(body, null, 2));
+		console.log("[Vapi Webhook] Event keys:", body ? Object.keys(body) : []);
 
 		// Handle different webhook events
 		switch (body?.type) {
@@ -26,7 +35,16 @@ export async function POST(request: Request) {
 				await handleCallStarted(body);
 				break;
 			case "call-ended":
+				console.log("[Vapi Webhook] Processing call-ended event");
 				await handleCallEnded(body);
+				break;
+			case "call-updated":
+				// Handle call status updates (might include manual termination)
+				console.log("[Vapi Webhook] Processing call-updated event");
+				if (body?.status === "ended" || body?.status === "completed" || body?.endedAt) {
+					console.log("[Vapi Webhook] Call-updated indicates call ended, processing...");
+					await handleCallEnded(body);
+				}
 				break;
 			case "assistant-message":
 				await handleAssistantMessage(body);
@@ -42,6 +60,11 @@ export async function POST(request: Request) {
 				break;
 			default:
 				console.log("[Vapi Webhook] Unhandled event type:", body?.type);
+				// If we see any event with endedAt or status 'ended', treat it as call ended
+				if (body?.endedAt || body?.status === "ended" || body?.status === "completed") {
+					console.log("[Vapi Webhook] Event has ended indicator, treating as call-ended");
+					await handleCallEnded(body);
+				}
 		}
 
 		return NextResponse.json({ ok: true });
@@ -89,11 +112,156 @@ async function handleCallStarted(event: any) {
 }
 
 async function handleCallEnded(event: any) {
-	console.log("[Vapi Webhook] Call ended:", event.callId);
+	console.log("[Vapi Webhook] Call ended:", event.callId, JSON.stringify(event, null, 2));
 	
-	if (supabase && event.callId) {
+	if (!supabase || !event.callId) {
+		console.error("[Vapi Webhook] Missing supabase or callId");
+		return;
+	}
+
+	try {
+		const updateData = {
+			status: 'completed',
+			call_end_time: new Date().toISOString(),
+			call_result: event.summary || 'Completed',
+			call_notes: event.transcript ? event.transcript.substring(0, 500) : undefined,
+			call_time: new Date().toISOString()
+		};
+
+		// Try multiple methods to find the candidate
+		let candidateId: number | null = null;
+		let found = false;
+
+		// Method 1: Find by vapi_call_id (most reliable)
+		const { data: candidatesByCallId, error: error1 } = await supabase
+			.from('candidates')
+			.select('id, phone')
+			.eq('vapi_call_id', event.callId)
+			.limit(1);
+
+		if (candidatesByCallId && candidatesByCallId.length > 0) {
+			candidateId = candidatesByCallId[0].id;
+			found = true;
+			console.log(`[Vapi Webhook] Found candidate ${candidateId} by vapi_call_id`);
+		} else if (error1) {
+			console.error("[Vapi Webhook] Error finding by vapi_call_id:", error1);
+		}
+
+		// Method 2: Try by candidateId from metadata
+		if (!found && event.metadata?.candidateId) {
+			const metadataCandidateId = parseInt(event.metadata.candidateId);
+			if (!isNaN(metadataCandidateId)) {
+				const { data: candidateByMetadataId, error: error2 } = await supabase
+					.from('candidates')
+					.select('id, phone, status')
+					.eq('id', metadataCandidateId)
+					.limit(1);
+
+				if (candidateByMetadataId && candidateByMetadataId.length > 0) {
+					candidateId = candidateByMetadataId[0].id;
+					found = true;
+					console.log(`[Vapi Webhook] Found candidate ${candidateId} by metadata candidateId`);
+				} else if (error2) {
+					console.error("[Vapi Webhook] Error finding by metadata candidateId:", error2);
+				}
+			}
+		}
+
+		// Method 3: Try by phone number (normalize both phone numbers)
+		if (!found) {
+			const phoneFromEvent = event.metadata?.phoneNumber || event.customer?.number;
+			if (phoneFromEvent) {
+				// Normalize phone number - remove all non-digits except +
+				const normalizedEventPhone = phoneFromEvent.replace(/[^\d+]/g, '');
+				
+				// Try exact match with status filter first
+				const phoneNumbersToTry = [phoneFromEvent, normalizedEventPhone].filter((p, i, arr) => arr.indexOf(p) === i);
+				
+				for (const phoneToTry of phoneNumbersToTry) {
+					if (found) break;
+					
+					// Try with status filter
+					const { data: candidatesByPhone, error: error3 } = await supabase
+						.from('candidates')
+						.select('id, phone, status')
+						.eq('phone', phoneToTry)
+						.in('status', ['calling', 'pending'])
+						.order('updated_at', { ascending: false })
+						.limit(1);
+
+					if (candidatesByPhone && candidatesByPhone.length > 0) {
+						candidateId = candidatesByPhone[0].id;
+						found = true;
+						console.log(`[Vapi Webhook] Found candidate ${candidateId} by phone number: ${phoneToTry}`);
+						break;
+					} else if (error3) {
+						console.error(`[Vapi Webhook] Error finding by phone ${phoneToTry}:`, error3);
+					}
+				}
+
+				// Try without status filter as fallback
+				if (!found) {
+					for (const phoneToTry of phoneNumbersToTry) {
+						if (found) break;
+						
+						const { data: candidatesByPhoneNoFilter, error: error4 } = await supabase
+							.from('candidates')
+							.select('id, phone, status')
+							.eq('phone', phoneToTry)
+							.order('updated_at', { ascending: false })
+							.limit(1);
+
+						if (candidatesByPhoneNoFilter && candidatesByPhoneNoFilter.length > 0) {
+							candidateId = candidatesByPhoneNoFilter[0].id;
+							found = true;
+							console.log(`[Vapi Webhook] Found candidate ${candidateId} by phone (no status filter): ${phoneToTry}`);
+							break;
+						} else if (error4) {
+							console.error(`[Vapi Webhook] Error finding by phone (no filter) ${phoneToTry}:`, error4);
+						}
+					}
+				}
+			}
+		}
+
+		// Update candidate if found
+		if (found && candidateId) {
+			// Also update vapi_call_id if not already set
+			const finalUpdateData = {
+				...updateData,
+				vapi_call_id: event.callId,
+				// VAPI call log fields
+				assistant_name: event.assistant?.name,
+				assistant_id: event.assistant?.id,
+				assistant_phone_number: event.phoneNumber?.number || event.assistantPhoneNumber,
+				call_type: event.type || (event.customer?.number ? "outbound" : "web"),
+				ended_reason: event.endedReason,
+				success_evaluation: event.successEvaluation,
+				score: event.score,
+				call_duration: event.duration,
+				call_cost: event.cost
+			};
+
+			const { error: updateError } = await supabase
+				.from('candidates')
+				.update(finalUpdateData)
+				.eq('id', candidateId);
+
+			if (updateError) {
+				console.error(`[Vapi Webhook] Error updating candidate ${candidateId}:`, updateError);
+			} else {
+				console.log(`[Vapi Webhook] Successfully updated candidate ${candidateId} to completed`);
+			}
+		} else {
+			console.error(`[Vapi Webhook] Could not find candidate for call ${event.callId}. Event data:`, {
+				callId: event.callId,
+				metadata: event.metadata,
+				customer: event.customer
+			});
+		}
+
+		// Also update calls table if it exists (this might fail silently if table doesn't exist)
 		try {
-			// Update calls table
 			await supabase
 				.from('calls')
 				.update({ 
@@ -104,63 +272,13 @@ async function handleCallEnded(event: any) {
 					call_transcript: event.transcript
 				})
 				.eq('vapi_call_id', event.callId);
-
-			// Find and update candidate status by vapi_call_id
-			const { data: candidates } = await supabase
-				.from('candidates')
-				.select('id')
-				.eq('vapi_call_id', event.callId)
-				.limit(1);
-
-			if (candidates && candidates.length > 0) {
-				const candidateId = candidates[0].id;
-				
-				// Update candidate status to completed
-				await supabase
-					.from('candidates')
-					.update({
-						status: 'completed',
-						call_end_time: new Date().toISOString(),
-						call_result: event.summary || 'Completed',
-						call_notes: event.transcript ? event.transcript.substring(0, 500) : undefined, // Truncate long transcripts
-						call_time: new Date().toISOString()
-					})
-					.eq('id', candidateId);
-
-				console.log(`[Vapi Webhook] Updated candidate ${candidateId} status to completed`);
-			} else {
-				console.log(`[Vapi Webhook] No candidate found with vapi_call_id: ${event.callId}`);
-				
-				// Try to find by phone number from metadata
-				if (event.metadata?.phoneNumber || event.customer?.number) {
-					const phoneNumber = event.metadata?.phoneNumber || event.customer?.number;
-					const { data: candidateByPhone } = await supabase
-						.from('candidates')
-						.select('id')
-						.eq('phone', phoneNumber)
-						.eq('status', 'calling')
-						.limit(1);
-
-					if (candidateByPhone && candidateByPhone.length > 0) {
-						const candidateId = candidateByPhone[0].id;
-						await supabase
-							.from('candidates')
-							.update({
-								status: 'completed',
-								call_end_time: new Date().toISOString(),
-								call_result: event.summary || 'Completed',
-								call_notes: event.transcript ? event.transcript.substring(0, 500) : undefined,
-								call_time: new Date().toISOString(),
-								vapi_call_id: event.callId
-							})
-							.eq('id', candidateId);
-						console.log(`[Vapi Webhook] Updated candidate ${candidateId} by phone number`);
-					}
-				}
-			}
 		} catch (error) {
-			console.error("Error updating call end status:", error);
+			// Calls table might not exist, that's okay
+			console.log("[Vapi Webhook] Calls table update skipped (table may not exist)");
 		}
+
+	} catch (error) {
+		console.error("[Vapi Webhook] Error updating call end status:", error);
 	}
 }
 

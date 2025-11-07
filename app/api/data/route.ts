@@ -55,6 +55,22 @@ export async function POST(request: NextRequest) {
           message: "Data imported successfully"
         });
 
+      case "create_candidate":
+        const { candidate } = body;
+        if (!candidate) {
+          return NextResponse.json(
+            { error: "Candidate data is required" },
+            { status: 400 }
+          );
+        }
+        
+        const newCandidate = await candidatesApi.create(candidate);
+        return NextResponse.json({
+          success: true,
+          candidate: newCandidate,
+          message: "Candidate created successfully"
+        });
+
       case "save_candidates":
         if (!candidates) {
           return NextResponse.json(
@@ -74,6 +90,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           message: "All data cleared successfully"
+        });
+
+      case "delete_candidates":
+        const { candidateIds } = body;
+        if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
+          return NextResponse.json(
+            { error: "Candidate IDs are required" },
+            { status: 400 }
+          );
+        }
+        
+        await candidatesApi.deleteMany(candidateIds);
+        return NextResponse.json({
+          success: true,
+          message: `${candidateIds.length} candidate(s) deleted successfully`
         });
 
       default:

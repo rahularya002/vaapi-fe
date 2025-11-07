@@ -11,6 +11,16 @@ export interface Candidate {
   vapi_call_id?: string;
   call_start_time?: string;
   call_end_time?: string;
+  // VAPI call log fields
+  assistant_name?: string;
+  assistant_id?: string;
+  assistant_phone_number?: string;
+  call_type?: string; // "outbound" | "web"
+  ended_reason?: string;
+  success_evaluation?: string; // "pass" | "fail"
+  score?: string;
+  call_duration?: number; // in seconds
+  call_cost?: number;
 }
 
 export interface CallConfiguration {

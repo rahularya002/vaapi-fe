@@ -27,7 +27,7 @@ export function Header({
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Phone className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold">Auto Caller Agent</h1>
+              <h1 className="text-3xl font-bold">Voixly</h1>
             </div>
             <Badge variant="outline" className="text-sm">
               {callQueueLength} in queue

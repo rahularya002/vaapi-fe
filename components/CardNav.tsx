@@ -4,8 +4,7 @@ import { gsap } from 'gsap';
 // use your own icon import if react-icons is not available
 import { GoArrowUpRight } from 'react-icons/go';
 import './CardNav.css';
-import dynamic from 'next/dynamic';
-const AccountMenu = dynamic(() => import('@/components/AccountMenu'), { ssr: false });
+import AccountMenu from '@/components/AccountMenu';
 
 type CardNavLink = {
   label: string;
@@ -179,7 +178,7 @@ const CardNav: React.FC<CardNavProps> = ({
             <img src={logo} alt={logoAlt} className="logo" />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative', zIndex: 100 }}>
             <AccountMenu />
           </div>
         </div>

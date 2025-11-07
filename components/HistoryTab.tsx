@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { History, ChevronDown, ChevronUp, Clock, Phone, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -5,10 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Candidate } from "@/lib/types";
 import { formatPhoneForDisplay } from "@/lib/phone-utils";
-import { useState } from "react";
 
 interface HistoryTabProps {
   callHistory: Candidate[];
+  onSyncFromVapi?: () => void;
 }
 
 interface CallDetails {
@@ -20,7 +21,7 @@ interface CallDetails {
   key_topics?: string[];
 }
 
-export function HistoryTab({ callHistory }: HistoryTabProps) {
+export function HistoryTab({ callHistory, onSyncFromVapi }: HistoryTabProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [callDetails, setCallDetails] = useState<Map<number, CallDetails>>(new Map());
   const [loadingDetails, setLoadingDetails] = useState<Set<number>>(new Set());
@@ -69,21 +70,59 @@ export function HistoryTab({ callHistory }: HistoryTabProps) {
   };
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return "N/A";
+    if (!seconds) return "-";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
   };
+
+  const formatEndedReason = (reason?: string) => {
+    if (!reason) return "-";
+    return reason
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const formatCallType = (type?: string) => {
+    if (!type) return "-";
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getEndedReasonColor = (reason?: string) => {
+    if (!reason) return "secondary";
+    if (reason.includes("customer-ended") || reason.includes("completed")) return "default";
+    if (reason.includes("not-answer") || reason.includes("timeout")) return "destructive";
+    return "secondary";
+  };
+
+  const getSuccessEvaluationColor = (evaluation?: string) => {
+    if (!evaluation) return "secondary";
+    if (evaluation.toLowerCase() === "pass") return "default";
+    if (evaluation.toLowerCase() === "fail") return "destructive";
+    return "secondary";
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <History className="h-5 w-5" />
-          <span>Call History ({callHistory.length})</span>
-        </CardTitle>
-        <CardDescription>
-          Review completed calls and their results
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center space-x-2">
+              <History className="h-5 w-5" />
+              <span>Call History ({callHistory.length})</span>
+            </CardTitle>
+            <CardDescription>
+              Review completed calls and their results
+            </CardDescription>
+          </div>
+          {onSyncFromVapi && (
+            <Button onClick={onSyncFromVapi} variant="outline" size="sm">
+              <History className="h-4 w-4 mr-2" />
+              Sync from VAPI
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {callHistory.length === 0 ? (
@@ -93,18 +132,22 @@ export function HistoryTab({ callHistory }: HistoryTabProps) {
             <p className="text-muted-foreground">Start making calls to see them here</p>
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Call Time</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="min-w-[120px]">CALL ID</TableHead>
+                  <TableHead className="min-w-[150px]">ASSISTANT</TableHead>
+                  <TableHead className="min-w-[150px]">ASSISTANT PHONE</TableHead>
+                  <TableHead className="min-w-[150px]">CUSTOMER PHONE</TableHead>
+                  <TableHead className="min-w-[100px]">TYPE</TableHead>
+                  <TableHead className="min-w-[150px]">ENDED REASON</TableHead>
+                  <TableHead className="min-w-[120px]">SUCCESS EVALUATION</TableHead>
+                  <TableHead className="min-w-[80px]">SCORE</TableHead>
+                  <TableHead className="min-w-[150px]">START TIME</TableHead>
+                  <TableHead className="min-w-[100px]">DURATION</TableHead>
+                  <TableHead className="min-w-[80px]">COST</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -114,8 +157,8 @@ export function HistoryTab({ callHistory }: HistoryTabProps) {
                   const isLoading = loadingDetails.has(candidate.id);
                   
                   return (
-                    <>
-                      <TableRow key={candidate.id}>
+                    <React.Fragment key={candidate.id}>
+                      <TableRow>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -125,33 +168,72 @@ export function HistoryTab({ callHistory }: HistoryTabProps) {
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </Button>
                         </TableCell>
-                        <TableCell className="font-medium">{candidate.name}</TableCell>
-                        <TableCell>{formatPhoneForDisplay(candidate.phone)}</TableCell>
-                        <TableCell>{candidate.position}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {candidate.vapi_call_id ? `${candidate.vapi_call_id.substring(0, 10)}...` : "-"}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant={candidate.status === 'completed' ? 'default' : 'secondary'}>
-                            {candidate.status || 'pending'}
+                          <div className="flex flex-col">
+                            <span className="font-medium">{candidate.assistant_name || "Unknown"}</span>
+                            {candidate.assistant_id && (
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {candidate.assistant_id.substring(0, 8)}...
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {candidate.assistant_phone_number 
+                            ? formatPhoneForDisplay(candidate.assistant_phone_number) 
+                            : "-"}
+                        </TableCell>
+                        <TableCell>{formatPhoneForDisplay(candidate.phone)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {formatCallType(candidate.call_type)}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {details?.call_duration ? formatDuration(details.call_duration) : 'N/A'}
+                          <Badge variant={getEndedReasonColor(candidate.ended_reason)}>
+                            {formatEndedReason(candidate.ended_reason)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
-                          {candidate.call_end_time 
-                            ? new Date(candidate.call_end_time).toLocaleString() 
-                            : candidate.call_time 
-                            ? new Date(candidate.call_time).toLocaleString() 
+                          {candidate.success_evaluation ? (
+                            <Badge variant={getSuccessEvaluationColor(candidate.success_evaluation)}>
+                              {candidate.success_evaluation.toUpperCase()}
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>{candidate.score || "N/A"}</TableCell>
+                        <TableCell>
+                          {candidate.call_start_time 
+                            ? new Date(candidate.call_start_time).toLocaleDateString('en-GB', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
                             : "N/A"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {candidate.vapi_call_id ? "VAPI" : "Manual"}
-                          </Badge>
+                          {candidate.call_duration 
+                            ? formatDuration(candidate.call_duration) 
+                            : details?.call_duration 
+                            ? formatDuration(details.call_duration) 
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {candidate.call_cost !== undefined 
+                            ? `$${candidate.call_cost.toFixed(2)}` 
+                            : "$0.00"}
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="bg-muted/50 p-6">
+                        <TableRow key={`${candidate.id}-details`}>
+                          <TableCell colSpan={12} className="bg-muted/50 p-6">
                             {isLoading ? (
                               <div className="text-center py-4">Loading call details...</div>
                             ) : (
@@ -216,7 +298,7 @@ export function HistoryTab({ callHistory }: HistoryTabProps) {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
@@ -227,3 +309,4 @@ export function HistoryTab({ callHistory }: HistoryTabProps) {
     </Card>
   );
 }
+

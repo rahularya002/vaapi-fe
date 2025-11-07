@@ -25,6 +25,16 @@ export interface Candidate {
   created_at?: string;
   updated_at?: string;
   vapi_call_id?: string;
+  // VAPI call log fields
+  assistant_name?: string;
+  assistant_id?: string;
+  assistant_phone_number?: string;
+  call_type?: string; // "outbound" | "web"
+  ended_reason?: string;
+  success_evaluation?: string; // "pass" | "fail"
+  score?: string;
+  call_duration?: number; // in seconds
+  call_cost?: number;
 }
 
 export interface CallConfig {
@@ -126,12 +136,16 @@ export const candidatesApi = {
   },
 
   async update(id: number, updates: Partial<Candidate>) {
+    console.log(`[Candidates API] update called for id: ${id}`, updates);
     if (!supabase) {
+      console.log("[Candidates API] Using fallback storage for update");
       const index = fallbackCandidates.findIndex(c => c.id === id);
       if (index !== -1) {
         fallbackCandidates[index] = { ...fallbackCandidates[index], ...updates, updated_at: new Date().toISOString() };
+        console.log(`[Candidates API] Fallback update successful:`, fallbackCandidates[index]);
         return fallbackCandidates[index];
       }
+      console.error(`[Candidates API] Candidate ${id} not found in fallback`);
       return null;
     }
 
@@ -142,7 +156,11 @@ export const candidatesApi = {
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error(`[Candidates API] Error updating candidate ${id}:`, error);
+      throw error;
+    }
+    console.log(`[Candidates API] Update successful:`, data);
     return data;
   },
 
@@ -160,9 +178,27 @@ export const candidatesApi = {
     if (error) throw error;
   },
 
-  async getByStatus(status: string) {
+  async deleteMany(ids: number[]) {
     if (!supabase) {
-      return fallbackCandidates.filter(c => c.status === status);
+      fallbackCandidates = fallbackCandidates.filter(c => !ids.includes(c.id));
+      return;
+    }
+
+    const { error } = await supabase
+      .from('candidates')
+      .delete()
+      .in('id', ids);
+    
+    if (error) throw error;
+  },
+
+  async getByStatus(status: string) {
+    console.log(`[Candidates API] getByStatus called with status: ${status}`);
+    if (!supabase) {
+      console.log("[Candidates API] Using fallback storage");
+      const filtered = fallbackCandidates.filter(c => c.status === status);
+      console.log(`[Candidates API] Fallback result - count: ${filtered.length}`);
+      return filtered;
     }
 
     const { data, error } = await supabase
@@ -171,7 +207,11 @@ export const candidatesApi = {
       .eq('status', status)
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error(`[Candidates API] Error getting by status ${status}:`, error);
+      throw error;
+    }
+    console.log(`[Candidates API] getByStatus result - count: ${data?.length || 0}`, data);
     return data || [];
   }
 };
@@ -179,20 +219,27 @@ export const candidatesApi = {
 // Call queue operations
 export const callQueueApi = {
   async getQueue() {
-    return candidatesApi.getByStatus('pending');
+    console.log("[Call Queue API] getQueue called");
+    const queue = await candidatesApi.getByStatus('pending');
+    console.log(`[Call Queue API] getQueue result - count: ${queue.length}`);
+    return queue;
   },
 
   async addToQueue(candidates: Omit<Candidate, 'id' | 'created_at' | 'updated_at'>[]) {
+    console.log(`[Call Queue API] addToQueue called with ${candidates.length} candidates`);
     const candidatesWithStatus = candidates.map(candidate => ({
       ...candidate,
       status: 'pending',
       added_at: new Date().toISOString()
     }));
     
-    return candidatesApi.createMany(candidatesWithStatus);
+    const result = await candidatesApi.createMany(candidatesWithStatus);
+    console.log(`[Call Queue API] addToQueue result - count: ${result.length}`);
+    return result;
   },
 
   async updateStatus(id: number, status: string, additionalData?: Partial<Candidate>) {
+    console.log(`[Call Queue API] updateStatus called - id: ${id}, status: ${status}`, additionalData);
     const updates: Partial<Candidate> = {
       status,
       updated_at: new Date().toISOString(),
@@ -205,7 +252,10 @@ export const callQueueApi = {
       updates.call_end_time = new Date().toISOString();
     }
 
-    return candidatesApi.update(id, updates);
+    console.log(`[Call Queue API] Updating with data:`, updates);
+    const result = await candidatesApi.update(id, updates);
+    console.log(`[Call Queue API] updateStatus result:`, result);
+    return result;
   },
 
   async clearQueue() {
@@ -226,10 +276,14 @@ export const callQueueApi = {
 // Call history operations
 export const callHistoryApi = {
   async getHistory() {
-    return candidatesApi.getByStatus('completed');
+    console.log("[Call History API] getHistory called");
+    const history = await candidatesApi.getByStatus('completed');
+    console.log(`[Call History API] getHistory result - count: ${history.length}`, history);
+    return history;
   },
 
   async addToHistory(candidate: Candidate) {
+    console.log(`[Call History API] addToHistory called for candidate:`, candidate);
     const historyCandidate = {
       ...candidate,
       status: 'completed',
@@ -237,7 +291,9 @@ export const callHistoryApi = {
       updated_at: new Date().toISOString()
     };
 
-    return candidatesApi.update(candidate.id, historyCandidate);
+    const result = await candidatesApi.update(candidate.id, historyCandidate);
+    console.log(`[Call History API] addToHistory result:`, result);
+    return result;
   }
 };
 
