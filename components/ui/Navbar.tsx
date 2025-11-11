@@ -34,8 +34,7 @@ export const Navbar = () => {
 
   return (
     <CardNav
-      logo="/logo.svg"
-      logoAlt="Company Logo"
+      brandName="Voixly"
       items={items.map(section => ({
         ...section,
         links: section.links.map(link => ({

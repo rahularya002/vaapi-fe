@@ -275,7 +275,14 @@ export function LeadsSection({
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">Leads ({displayCandidates.length})</CardTitle>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <span>Leads</span>
+                    {displayCandidates.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {displayCandidates.length}
+                      </Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription className="mt-1">
                     Manage and view all your leads
                   </CardDescription>

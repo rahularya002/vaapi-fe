@@ -1,7 +1,6 @@
 'use client'
 import React, { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle, Color } from 'ogl';
-import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
 
 import './Threads.css';
 
@@ -137,11 +136,7 @@ const Threads: React.FC<ThreadsProps> = ({
   ...rest
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const animationFrameId = useRef<number | null>(null);
-  const [intersectionRef, isIntersecting] = useIntersectionObserver({
-    threshold: 0.1,
-    rootMargin: '50px'
-  });
+  const animationFrameId = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -200,12 +195,6 @@ const Threads: React.FC<ThreadsProps> = ({
     }
 
     function update(t: number) {
-      // Only animate when visible
-      if (!isIntersecting) {
-        animationFrameId.current = requestAnimationFrame(update);
-        return;
-      }
-
       if (enableMouseInteraction) {
         const smoothing = 0.05;
         currentMouse[0] += smoothing * (targetMouse[0] - currentMouse[0]);
@@ -234,9 +223,9 @@ const Threads: React.FC<ThreadsProps> = ({
       if (container.contains(gl.canvas)) container.removeChild(gl.canvas);
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, [color, amplitude, distance, enableMouseInteraction, isIntersecting]);
+  }, [color, amplitude, distance, enableMouseInteraction]);
 
-  return <div ref={intersectionRef} className="threads-container" {...rest} />;
+  return <div ref={containerRef} className="threads-container" {...rest} />;
 };
 
 export default Threads;

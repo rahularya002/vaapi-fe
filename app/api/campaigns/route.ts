@@ -7,11 +7,6 @@ export interface Campaign {
   name: string;
   industry: string;
   goal: string;
-  openingScript: string;
-  localizeTone: boolean;
-  complianceCheck: boolean;
-  cadence: boolean;
-  quality: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -62,11 +57,6 @@ export async function POST(request: NextRequest) {
       name,
       industry,
       goal,
-      openingScript,
-      localizeTone,
-      complianceCheck,
-      cadence,
-      quality,
     } = body;
 
     // Validate required fields
@@ -80,9 +70,6 @@ export async function POST(request: NextRequest) {
     if (!goal) {
       errors.goal = "Goal is required";
     }
-    if (!openingScript || !openingScript.trim()) {
-      errors.openingScript = "Opening script is required";
-    }
 
     if (Object.keys(errors).length > 0) {
       return NextResponse.json(
@@ -92,14 +79,9 @@ export async function POST(request: NextRequest) {
     }
 
     const campaign: Omit<Campaign, 'id' | 'created_at' | 'updated_at'> = {
-      name,
+      name: name.trim(),
       industry,
       goal,
-      openingScript,
-      localizeTone: localizeTone || false,
-      complianceCheck: complianceCheck !== undefined ? complianceCheck : true,
-      cadence: cadence || false,
-      quality: quality !== undefined ? quality : true,
     };
 
     // Check for duplicate name (in memory or DB)
@@ -158,11 +140,6 @@ export async function POST(request: NextRequest) {
           name: campaign.name,
           industry: campaign.industry,
           goal: campaign.goal,
-          opening_script: campaign.openingScript,
-          localize_tone: campaign.localizeTone,
-          compliance_check: campaign.complianceCheck,
-          cadence: campaign.cadence,
-          quality: campaign.quality,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }])
@@ -192,11 +169,6 @@ export async function POST(request: NextRequest) {
         name: data.name,
         industry: data.industry,
         goal: data.goal,
-        openingScript: data.opening_script,
-        localizeTone: data.localize_tone,
-        complianceCheck: data.compliance_check,
-        cadence: data.cadence,
-        quality: data.quality,
         created_at: data.created_at,
         updated_at: data.updated_at,
       };

@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Megaphone, Sparkles, Loader2, Plus, Phone, Play, Pause, SkipForward, Square, Users, Trash2, Bot } from "lucide-react";
+import { Megaphone, Loader2, Plus, Phone, Play, Pause, SkipForward, Square, Users, Trash2, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,11 +23,6 @@ interface Campaign {
   name: string;
   industry: string;
   goal: string;
-  openingScript: string;
-  localizeTone: boolean;
-  complianceCheck: boolean;
-  cadence: boolean;
-  quality: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -53,31 +46,13 @@ const goals = [
   { value: "winback", label: "Winback" },
 ];
 
-const industryTemplates: Record<string, { description: string; script: string }> = {
-  saas: {
-    description: "Software as a Service outreach and demos",
-    script: "Hi {{name}}, I'm reaching out from {{company}}. We noticed you might be interested in our SaaS solution. Would you be open to a quick 15-minute demo to see how it could help your business?",
-  },
-  ecommerce: {
-    description: "E-commerce customer engagement and support",
-    script: "Hello {{name}}, this is {{company}}. We wanted to check in about your recent order and see if you need any assistance. Also, we have some exclusive offers that might interest you!",
-  },
-  manufacturing: {
-    description: "Manufacturing supply chain and B2B outreach",
-    script: "Hi {{name}}, I'm calling from {{company}}. We specialize in manufacturing solutions and thought our services might align with your operations. Could we schedule a brief call to discuss?",
-  },
-  "real-estate": {
-    description: "Real estate property follow-ups and inquiries",
-    script: "Hi {{name}}, this is {{company}}. I'm following up on your interest in our property listings. Would you like to schedule a viewing or have any questions about the properties?",
-  },
-  healthcare: {
-    description: "Appointment reminders and follow-up care",
-    script: "Hi {{name}}, this is a reminder for your appointment with Dr. {{doctor_name}} on {{date}} at {{time}}. Reply YES to confirm or call us to reschedule.",
-  },
-  education: {
-    description: "Educational program enrollment and information",
-    script: "Hello {{name}}, this is {{company}}. We're reaching out about our educational programs that might be a great fit for you. Would you like to learn more about our courses and enrollment options?",
-  },
+const industryDescriptions: Record<string, string> = {
+  saas: "Software as a Service outreach and demos",
+  ecommerce: "E-commerce customer engagement and support",
+  manufacturing: "Manufacturing supply chain and B2B outreach",
+  "real-estate": "Real estate property follow-ups and inquiries",
+  healthcare: "Appointment reminders and follow-up care",
+  education: "Educational program enrollment and information",
 };
 
 export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
@@ -89,11 +64,6 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
   const [campaignName, setCampaignName] = useState("");
   const [industry, setIndustry] = useState<string>("");
   const [goal, setGoal] = useState<string>("");
-  const [openingScript, setOpeningScript] = useState("");
-  const [localizeTone, setLocalizeTone] = useState(false);
-  const [complianceCheck, setComplianceCheck] = useState(true);
-  const [cadence, setCadence] = useState(false);
-  const [quality, setQuality] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [newCampaignId, setNewCampaignId] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -215,9 +185,6 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
     if (!goal) {
       newErrors.goal = "Goal is required";
     }
-    if (!openingScript.trim()) {
-      newErrors.openingScript = "Opening script is required";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -226,20 +193,12 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
   const handleIndustryChange = (value: string) => {
     setIndustry(value);
     setErrors((prev) => ({ ...prev, industry: "" }));
-    if (value && industryTemplates[value]) {
-      setOpeningScript(industryTemplates[value].script);
-    }
   };
 
   const resetForm = () => {
     setCampaignName("");
     setIndustry("");
     setGoal("");
-    setOpeningScript("");
-    setLocalizeTone(false);
-    setComplianceCheck(true);
-    setCadence(false);
-    setQuality(true);
     setErrors({});
   };
 
@@ -255,11 +214,6 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
       name: campaignName.trim(),
       industry,
       goal,
-      openingScript: openingScript.trim(),
-      localizeTone,
-      complianceCheck,
-      cadence,
-      quality,
     };
 
     // Optimistic update - add temporary campaign to the top of the list
@@ -348,7 +302,6 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
     }
   };
 
-  const previewScript = openingScript || "Enter your opening script to see a preview...";
 
   const getIndustryLabel = (value: string) => {
     return industries.find((ind) => ind.value === value)?.label || value;
@@ -560,9 +513,16 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Megaphone className="h-5 w-5" />
-                <span>Campaigns ({campaigns.length})</span>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Megaphone className="h-5 w-5" />
+                  <span>Campaigns</span>
+                </div>
+                {campaigns.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {campaigns.length}
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Manage your campaigns and their configurations
@@ -640,7 +600,6 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
                       <TableHead>Name</TableHead>
                       <TableHead>Industry</TableHead>
                       <TableHead>Goal</TableHead>
-                      <TableHead>Features</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -671,22 +630,6 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
                         <Badge variant="secondary">{getIndustryLabel(campaign.industry)}</Badge>
                       </TableCell>
                       <TableCell>{getGoalLabel(campaign.goal)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {campaign.localizeTone && (
-                            <Badge variant="outline" className="text-xs">Localize</Badge>
-                          )}
-                          {campaign.complianceCheck && (
-                            <Badge variant="outline" className="text-xs">Compliance</Badge>
-                          )}
-                          {campaign.cadence && (
-                            <Badge variant="outline" className="text-xs">Cadence</Badge>
-                          )}
-                          {campaign.quality && (
-                            <Badge variant="outline" className="text-xs">Quality</Badge>
-                          )}
-                        </div>
-                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {campaign.created_at
                           ? new Date(campaign.created_at).toLocaleDateString()
@@ -722,7 +665,7 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
               <span>Create Campaign</span>
             </DialogTitle>
             <DialogDescription>
-              Set up a new campaign with industry-specific templates and AI-powered scripts
+              Create a new campaign by selecting an industry and goal
             </DialogDescription>
           </DialogHeader>
 
@@ -769,9 +712,9 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
                 {errors.industry && (
                   <p className="text-sm text-destructive">{errors.industry}</p>
                 )}
-                {industry && industryTemplates[industry] && (
+                {industry && industryDescriptions[industry] && (
                   <p className="text-sm text-muted-foreground">
-                    {industryTemplates[industry].description}
+                    {industryDescriptions[industry]}
                   </p>
                 )}
               </div>
@@ -801,190 +744,32 @@ export function CampaignsSection({ onSaveCampaign }: CampaignsSectionProps) {
               </div>
             </div>
 
-            {/* Assistant Panel - Only show when industry is selected */}
-            {industry && (
-              <div className="space-y-6 pt-6 border-t transition-all duration-300 ease-in-out">
-                <div>
-                  <h3 className="text-lg font-semibold mb-1">AI Assistant Configuration</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Configure your AI assistant for this campaign
-                  </p>
-                </div>
-
-                {/* Opening Script & Objection Handling */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Opening Script & Objection Handling</CardTitle>
-                    <CardDescription>
-                      Define how your AI assistant will start conversations and handle objections
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="opening-script" className="text-sm font-medium">
-                        Script <span className="text-destructive">*</span>
-                      </Label>
-                      <Textarea
-                        id="opening-script"
-                        placeholder="Enter your opening script with variables like {{name}}, {{company}}, {{date}}..."
-                        value={openingScript}
-                        onChange={(e) => {
-                          setOpeningScript(e.target.value);
-                          setErrors((prev) => ({ ...prev, openingScript: "" }));
-                        }}
-                        className={cn("min-h-[140px] resize-none", errors.openingScript && "border-destructive")}
-                        disabled={isCreating}
-                      />
-                      {errors.openingScript && (
-                        <p className="text-sm text-destructive">{errors.openingScript}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Use variables like {"{{name}}"}, {"{{date}}"}, {"{{company}}"} for personalization
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* AI Features */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">AI Features</CardTitle>
-                    <CardDescription>
-                      Enable advanced AI capabilities for your campaign
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                      <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="localize-tone" className="text-sm font-medium cursor-pointer">
-                          Localize Tone
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Adapt tone and language to regional preferences
-                        </p>
-                      </div>
-                      <Switch
-                        id="localize-tone"
-                        checked={localizeTone}
-                        onCheckedChange={setLocalizeTone}
-                        disabled={isCreating}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                      <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="compliance-check" className="text-sm font-medium cursor-pointer">
-                          Compliance Check
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Automatically check for compliance issues
-                        </p>
-                      </div>
-                      <Switch
-                        id="compliance-check"
-                        checked={complianceCheck}
-                        onCheckedChange={setComplianceCheck}
-                        disabled={isCreating}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                      <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="cadence" className="text-sm font-medium cursor-pointer">
-                          Cadence
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Enable automated follow-up cadence
-                        </p>
-                      </div>
-                      <Switch
-                        id="cadence"
-                        checked={cadence}
-                        onCheckedChange={setCadence}
-                        disabled={isCreating}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                      <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="quality" className="text-sm font-medium cursor-pointer">
-                          Quality
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Enable quality scoring and monitoring
-                        </p>
-                      </div>
-                      <Switch
-                        id="quality"
-                        checked={quality}
-                        onCheckedChange={setQuality}
-                        disabled={isCreating}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Live Preview */}
-                <Card className="bg-muted/30 border-dashed">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center space-x-2">
-                      <Sparkles className="h-4 w-4" />
-                      <span>Live Preview</span>
-                    </CardTitle>
-                    <CardDescription>
-                      Preview of how your AI script will appear in calls
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-background border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-sm font-medium">Sample Call</span>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap text-muted-foreground leading-relaxed">
-                        {previewScript.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
-                          const samples: Record<string, string> = {
-                            name: "John Doe",
-                            company: "Acme Corp",
-                            date: "December 15, 2024",
-                            time: "2:00 PM",
-                            doctor_name: "Dr. Smith",
-                          };
-                          return samples[varName] || `[${varName}]`;
-                        })}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      resetForm();
-                      setIsDialogOpen(false);
-                    }}
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleCreateCampaign}
-                    disabled={isCreating || !campaignName || !industry || !goal || !openingScript}
-                  >
-                    {isCreating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Create Campaign"
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(false);
+                }}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateCampaign}
+                disabled={isCreating || !campaignName || !industry || !goal}
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Campaign"
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -20,8 +20,9 @@ export type CardNavItem = {
 };
 
 export interface CardNavProps {
-  logo: string;
+  logo?: string;
   logoAlt?: string;
+  brandName?: string;
   items: CardNavItem[];
   className?: string;
   ease?: string;
@@ -34,6 +35,7 @@ export interface CardNavProps {
 const CardNav: React.FC<CardNavProps> = ({
   logo,
   logoAlt = 'Logo',
+  brandName,
   items,
   className = '',
   ease = 'power3.out',
@@ -175,7 +177,19 @@ const CardNav: React.FC<CardNavProps> = ({
           </div>
 
           <div className="logo-container">
-            <img src={logo} alt={logoAlt} className="logo" />
+            {brandName ? (
+              <span className="brand-name" style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: 600, 
+                letterSpacing: '-0.02em',
+                color: menuColor || 'var(--foreground)',
+                fontFamily: 'var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+              }}>
+                {brandName}
+              </span>
+            ) : logo ? (
+              <img src={logo} alt={logoAlt} className="logo" />
+            ) : null}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative', zIndex: 100 }}>

@@ -13,6 +13,9 @@ import { CallHistorySection } from "@/components/CallHistorySection";
 import { SettingsSection } from "@/components/SettingsSection";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Phone } from "lucide-react";
 
 type SectionKey = "dashboard" | "leads" | "campaigns" | "assistants" | "history" | "settings";
 
@@ -35,10 +38,77 @@ export default function Dashboard() {
   const [isCalling, setIsCalling] = useState(false);
   const [currentCall, setCurrentCall] = useState<Candidate | null>(null);
   const [activeSection, setActiveSection] = useState<SectionKey>("dashboard");
+  const [showTwilioDialog, setShowTwilioDialog] = useState(false);
+  const [hasCheckedTwilio, setHasCheckedTwilio] = useState(false);
 
   useEffect(() => {
     loadCallData();
   }, []);
+
+  useEffect(() => {
+    if (session?.user?.email) {
+      checkTwilioIntegration();
+    }
+  }, [session]);
+
+  const checkTwilioIntegration = async () => {
+    if (!session?.user?.email || hasCheckedTwilio) return;
+    
+    try {
+      // Check if user has dismissed the dialog before (user-specific)
+      const dismissed = localStorage.getItem(`twilio-dialog-dismissed-${session.user.email}`);
+      if (dismissed === "true") {
+        setHasCheckedTwilio(true);
+        return;
+      }
+
+      // Check if Twilio is configured
+      try {
+        const response = await fetch("/api/settings");
+        
+        // Check if response is OK and is JSON
+        if (!response.ok) {
+          // If settings endpoint fails, assume new user and show dialog
+          setShowTwilioDialog(true);
+          setHasCheckedTwilio(true);
+          return;
+        }
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          // If response is not JSON, assume new user and show dialog
+          setShowTwilioDialog(true);
+          setHasCheckedTwilio(true);
+          return;
+        }
+
+        const result = await response.json();
+        
+        // If settings exist and Twilio is configured, don't show dialog
+        if (result.success && result.settings?.twilio) {
+          const twilio = result.settings.twilio;
+          // Check if Twilio is properly configured
+          if (twilio.accountSid && twilio.authToken && twilio.phoneNumber) {
+            // Twilio is configured, don't show dialog
+            setHasCheckedTwilio(true);
+            return;
+          }
+        }
+        
+        // If we get here, either no settings exist or Twilio is not configured
+        // Show dialog for new users (first time they see the dashboard)
+        setShowTwilioDialog(true);
+      } catch (fetchError) {
+        // If fetch fails, assume new user and show dialog
+        setShowTwilioDialog(true);
+      }
+      
+      setHasCheckedTwilio(true);
+    } catch (error) {
+      console.error("Error checking Twilio integration:", error);
+      setHasCheckedTwilio(true);
+    }
+  };
 
   const loadCallData = async () => {
     try {
@@ -390,6 +460,26 @@ export default function Dashboard() {
     }
   };
 
+  const handleConnectTwilio = () => {
+    setShowTwilioDialog(false);
+    setActiveSection("settings");
+    // Scroll to integrations section after a brief delay
+    setTimeout(() => {
+      const integrationsSection = document.querySelector('[data-section="integrations"]');
+      if (integrationsSection) {
+        integrationsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 300);
+  };
+
+  const handleDismissTwilio = () => {
+    setShowTwilioDialog(false);
+    // Store dismissal with user email to make it user-specific
+    if (session?.user?.email) {
+      localStorage.setItem(`twilio-dialog-dismissed-${session.user.email}`, "true");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar
@@ -404,6 +494,34 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
+
+      {/* Twilio Integration Dialog */}
+      <Dialog open={showTwilioDialog} onOpenChange={setShowTwilioDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Phone className="h-5 w-5 text-primary" />
+              <span>Connect Twilio</span>
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              To start making calls, you'll need to connect your Twilio account. This allows us to manage phone numbers and handle calling functionality.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              You can connect your Twilio integration in Settings. This will enable you to make calls to your leads and manage your calling campaigns.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button onClick={handleConnectTwilio} className="flex-1">
+                Connect Twilio
+              </Button>
+              <Button variant="outline" onClick={handleDismissTwilio} className="flex-1">
+                Do it later
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

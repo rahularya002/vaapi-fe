@@ -123,7 +123,7 @@ export function SettingsSection({ onSaveSettings }: SettingsSectionProps) {
       </Card>
 
       {/* Integrations */}
-      <Card>
+      <Card data-section="integrations">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Phone className="h-5 w-5" />

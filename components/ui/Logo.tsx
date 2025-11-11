@@ -19,7 +19,7 @@ export default function Logo() {
   return (
     <div
       style={{
-        height: '200px',
+        height: '100px',
         position: 'relative',
         overflow: 'hidden',
         maxWidth: '960px',
