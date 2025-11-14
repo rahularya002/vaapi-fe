@@ -79,7 +79,6 @@ export function AssistantTab({
       
       if (result.success && result.assistants) {
         setVapiAssistants(result.assistants);
-        console.log("Fetched VAPI assistants:", result.assistants);
       } else {
         console.error("Failed to fetch assistants:", result.error);
       }
@@ -99,14 +98,6 @@ export function AssistantTab({
         const vapiAssistant = result.assistant;
         setSelectedAssistant(vapiAssistant);
         
-        console.log("VAPI Assistant loaded:", vapiAssistant);
-        console.log("VAPI Instructions (raw):", vapiAssistant.instructions);
-        console.log("VAPI Instructions (type):", typeof vapiAssistant.instructions);
-        console.log("VAPI First Message:", vapiAssistant.firstMessage);
-        console.log("All VAPI assistant keys:", Object.keys(vapiAssistant));
-        console.log("VAPI assistant full object:", JSON.stringify(vapiAssistant, null, 2));
-        console.log("VAPI model object:", vapiAssistant.model);
-        console.log("VAPI model keys:", vapiAssistant.model ? Object.keys(vapiAssistant.model) : "no model");
         
         // VAPI might return instructions in different fields - check all possibilities
         // Check explicitly for undefined/null to handle empty strings correctly

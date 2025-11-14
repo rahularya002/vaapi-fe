@@ -215,9 +215,10 @@ const ParticleCard: React.FC<{
         gsap.to(element, {
           rotateX: 5,
           rotateY: 5,
-          duration: 0.3,
+          duration: 0.2,
           ease: 'power2.out',
-          transformPerspective: 1000
+          transformPerspective: 1000,
+          force3D: true
         });
       }
     };
@@ -230,8 +231,9 @@ const ParticleCard: React.FC<{
         gsap.to(element, {
           rotateX: 0,
           rotateY: 0,
-          duration: 0.3,
-          ease: 'power2.out'
+          duration: 0.2,
+          ease: 'power2.out',
+          force3D: true
         });
       }
 
@@ -239,8 +241,9 @@ const ParticleCard: React.FC<{
         gsap.to(element, {
           x: 0,
           y: 0,
-          duration: 0.3,
-          ease: 'power2.out'
+          duration: 0.2,
+          ease: 'power2.out',
+          force3D: true
         });
       }
     };
@@ -263,7 +266,8 @@ const ParticleCard: React.FC<{
           rotateY,
           duration: 0.1,
           ease: 'power2.out',
-          transformPerspective: 1000
+          transformPerspective: 1000,
+          force3D: true
         });
       }
 
@@ -274,8 +278,9 @@ const ParticleCard: React.FC<{
         magnetismAnimationRef.current = gsap.to(element, {
           x: magnetX,
           y: magnetY,
-          duration: 0.3,
-          ease: 'power2.out'
+          duration: 0.2,
+          ease: 'power2.out',
+          force3D: true
         });
       }
     };
@@ -600,7 +605,8 @@ const MagicBento: React.FC<BentoProps> = ({
                       rotateY,
                       duration: 0.1,
                       ease: 'power2.out',
-                      transformPerspective: 1000
+                      transformPerspective: 1000,
+                      force3D: true
                     });
                   }
 
@@ -610,8 +616,9 @@ const MagicBento: React.FC<BentoProps> = ({
                     gsap.to(el, {
                       x: magnetX,
                       y: magnetY,
-                      duration: 0.3,
-                      ease: 'power2.out'
+                      duration: 0.2,
+                      ease: 'power2.out',
+                      force3D: true
                     });
                   }
                 };
@@ -623,8 +630,9 @@ const MagicBento: React.FC<BentoProps> = ({
                     gsap.to(el, {
                       rotateX: 0,
                       rotateY: 0,
-                      duration: 0.3,
-                      ease: 'power2.out'
+                      duration: 0.2,
+                      ease: 'power2.out',
+                      force3D: true
                     });
                   }
 
@@ -632,8 +640,9 @@ const MagicBento: React.FC<BentoProps> = ({
                     gsap.to(el, {
                       x: 0,
                       y: 0,
-                      duration: 0.3,
-                      ease: 'power2.out'
+                      duration: 0.2,
+                      ease: 'power2.out',
+                      force3D: true
                     });
                   }
                 };

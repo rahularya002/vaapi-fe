@@ -197,4 +197,17 @@
     will-change: transform, opacity;
     backface-visibility: hidden;
   }
+  
+  /* Optimize GSAP animations */
+  [data-gsap-animated] {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  
+  /* Optimize Threads canvas */
+  .threads-container canvas {
+    will-change: transform;
+    transform: translateZ(0);
+  }
 }

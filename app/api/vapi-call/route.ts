@@ -56,8 +56,6 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    console.log("Using VAPI assistant directly with ID:", assistantId || process.env.VAPI_ASSISTANT_ID);
-    console.log("VAPI will use the assistant's pre-configured script, voice, and all settings");
 
     // Make the call via Vapi API
     const response = await fetch(VAPI_API_URL, {
